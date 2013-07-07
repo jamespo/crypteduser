@@ -69,4 +69,5 @@ if __name__ == '__main__':
     if os.environ.get('CREATEDB') is not None:
         print 'creating database'
         db.create_all()
-    app.run()
+    else:
+        app.run()
