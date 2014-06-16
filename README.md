@@ -10,6 +10,7 @@ Install the requirements either in a virtualenv or natively
 
 Edit the configuration file (crypteduser.conf) to set the database and disable debug
 Create the database by setting the environment variable CREATEDB
+
     CREATEDB=1 ./crypteduser.py
 
 Then run the server.
