@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-
 # crypteduser
 
-from flask import Flask, request, abort
+from itsdangerous import JSONWebSignatureSerializer
+from flask import Flask, request, abort, make_response
 from flask.ext.sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
 from passlib.hash import pbkdf2_sha256
 import ConfigParser
 import os
@@ -18,6 +19,7 @@ config = readconf()
 app.debug = config.get('Main', 'debug')
 app.config['SQLALCHEMY_DATABASE_URI'] = config.get('Main', 'db_uri')
 db = SQLAlchemy(app)
+secret_key = config.get('Main', 'secret_key')
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -40,8 +42,12 @@ def adduser():
     username = request.form["username"]
     password = request.form["password"]
     newuser = User(username, hashpass(password))
-    db.session.add(newuser)
-    db.session.commit()
+    try:
+        db.session.add(newuser)
+        db.session.commit()
+    except IntegrityError:
+        # user already exists
+        abort(401, 'failed')
     return '%s added' % username
 
 @app.route('/verifyuser/', methods=['POST'])
@@ -51,8 +57,12 @@ def verifyuser():
     dbuser = User.query.filter_by(username=username).first()
     if dbuser is not None:
         if pbkdf2_sha256.verify(password, dbuser.password):
-            return 'ok'
-    abort(401, 'failed')
+            # user ok, return JWT cookie
+            s = JSONWebSignatureSerializer(secret_key)
+            resp = make_response('ok')
+            resp.set_cookie('user', s.dumps({ 'uid': username }))
+            return resp
+    abort(403, 'failed')
 
 @app.route('/updatepass/', methods=['POST'])
 def updatepass():
