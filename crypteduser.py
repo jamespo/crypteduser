@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # crypteduser
 
-from itsdangerous import JSONWebSignatureSerializer, BadSignature
+import jwt
 from flask import Flask, request, abort, make_response
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import IntegrityError
@@ -57,14 +57,13 @@ def adduser():
 @app.route('/verifycookie/', methods=['GET'])
 def verifycookie():
     try:
-        u = request.cookies.get('user')
-        assert u is not None
+        encoded = request.cookies.get('user')
+        assert encoded is not None
     except:
         abort(403, 'no cookie')
-    s = JSONWebSignatureSerializer(secret_key)
     try:
-        payload = s.loads(u)
-    except BadSignature:
+        payload = jwt.decode(encoded, secret_key, algorithms=['HS256'])
+    except jwt.DecodeError:
         abort(403, 'failed decode')
     return 'ok'
 
@@ -77,9 +76,9 @@ def verifyuser():
     if dbuser is not None:
         if pbkdf2_sha256.verify(password, dbuser.password):
             # user ok, return JWT cookie
-            s = JSONWebSignatureSerializer(secret_key)
+            encoded = jwt.encode({ 'uid': username }, secret_key, algorithm='HS256')
             resp = make_response('ok')
-            resp.set_cookie('user', s.dumps({ 'uid': username }))
+            resp.set_cookie('user', encoded)
             return resp
     abort(403, 'failed')
 
